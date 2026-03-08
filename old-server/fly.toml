@@ -1,0 +1,55 @@
+# fly.toml app configuration file generated for schma-api on 2025-09-02T11:21:47+10:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'schma-api'
+primary_region = 'syd'
+
+[build]
+
+[env]
+  GO_ENV = 'development'
+  USE_PCS = "0"
+  USE_ITN = "0"
+  HF_HOME = "/data/hf"
+  TRANSFORMERS_CACHE = "/data/hf"
+
+[[mounts]]
+  source = 'schma_data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = false
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '60s'
+    method = 'GET'
+    path = '/healthz'
+    protocol = 'http'
+
+    [http_service.checks.headers]
+      X-Forwarded-Proto = 'https'
+
+  [[http_service.checks]]
+    interval = '60s'
+    timeout = '10s'
+    grace_period = '90s'
+    method = 'GET'
+    path = '/readyz'
+    protocol = 'http'
+
+    [http_service.checks.headers]
+      X-Forwarded-Proto = 'https'
+
+[[vm]]
+  memory = 2048
+  cpu_kind = 'shared'
+  cpus = 1

@@ -1,0 +1,70 @@
+{
+    "pci": {
+        "card_brands": [
+            "visa",
+            "mastercard",
+            "master card",
+            "amex",
+            "american express",
+            "discover",
+            "diners",
+            "jcb",
+            "unionpay",
+            "maestro"
+        ],
+        "pan_context": [
+            "credit card",
+            "debit card",
+            "card number",
+            "card no",
+            "card #",
+            "card details",
+            "card info",
+            "cardholder",
+            "card holder",
+            "payment",
+            "checkout",
+            "pan"
+        ],
+        "expiry_context": [
+            "expiry",
+            "expiration",
+            "expires",
+            "exp",
+            "valid thru",
+            "valid until",
+            "good thru",
+            "good until",
+            "use thru"
+        ],
+        "cvv_context": [
+            "cvv",
+            "cvc",
+            "security code",
+            "card code",
+            "verification code",
+            "cid"
+        ],
+        "currency_terms": [
+            "aud",
+            "usd",
+            "eur",
+            "gbp",
+            "cad",
+            "nzd",
+            "$",
+            "€",
+            "£"
+        ],
+        "iban_like_terms": ["iban", "bic", "swift"],
+        "banking_but_not_card": [
+            "bsb",
+            "routing",
+            "account number",
+            "acct #",
+            "sort code",
+            "ifsc",
+            "micr"
+        ]
+    }
+}

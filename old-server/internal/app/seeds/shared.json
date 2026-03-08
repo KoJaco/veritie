@@ -1,0 +1,18 @@
+{
+    "shared": {
+        "denylist_false_positives": [
+            "visa (travel)",
+            "master (role)",
+            "charge card (office access)",
+            "apple pay",
+            "google pay",
+            "bsb as acronym in other contexts",
+            "may (month vs modal)",
+            "unit testing",
+            "addressing a crowd",
+            "drive as verb"
+        ],
+        "placeholder_kinds": ["PHI", "PII", "PCI"],
+        "priority_order": ["PCI", "PHI", "PII"]
+    }
+}

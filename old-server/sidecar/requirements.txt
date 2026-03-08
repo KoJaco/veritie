@@ -1,0 +1,20 @@
+# Web stack (match venv)
+fastapi==0.116.1
+starlette==0.47.3
+pydantic==2.11.7
+uvicorn[standard]==0.35.0
+orjson==3.11.2
+
+# Tokenizer service deps
+transformers==4.53.3
+tokenizers==0.21.4
+sentencepiece==0.2.1
+huggingface-hub==0.34.4
+regex==2025.7.34
+requests==2.32.5
+
+# Normalizer deps
+pynini==2.1.6.post1
+
+# Optional but handy
+python-dotenv==1.1.1

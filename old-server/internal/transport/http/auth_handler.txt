@@ -1,0 +1,64 @@
+package http
+
+import (
+	"encoding/json"
+	"net/http"
+
+	domain_auth "schma.ai/internal/domain/auth"
+	"schma.ai/internal/pkg/logger"
+	"schma.ai/internal/transport/http/middleware"
+)
+
+// AuthHandler handles HTTP authentication requests
+type AuthHandler struct {
+	sessionManager domain_auth.WSSessionManager
+}
+
+// NewAuthHandler creates a new auth handler
+func NewAuthHandler(sessionManager domain_auth.WSSessionManager) *AuthHandler {
+	return &AuthHandler{
+		sessionManager: sessionManager,
+	}
+}
+
+// HandleAuth handles the POST /api/auth endpoint
+func (h *AuthHandler) HandleAuth(w http.ResponseWriter, r *http.Request) {
+	logger.Debugf("🔑 [AUTH_HANDLER] Received %s request to %s", r.Method, r.URL.Path)
+	logger.Debugf("🔑 [AUTH_HANDLER] Headers: %+v", r.Header)
+
+	if r.Method != http.MethodPost {
+		logger.Errorf("❌ [AUTH_HANDLER] Method not allowed: %s", r.Method)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get authenticated principal from middleware
+	principal, ok := middleware.GetPrincipal(r.Context())
+	if !ok {
+		logger.Errorf("❌ [AUTH_HANDLER] No principal found in context")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	logger.Debugf("🔑 [AUTH_HANDLER] Principal found: %s (AppID: %s)", principal.AppName, principal.AppID)
+
+	// Create session
+	logger.Debugf("🔑 [AUTH_HANDLER] Creating session for principal: %s", principal.AppName)
+	session, err := h.sessionManager.CreateSession(r.Context(), principal)
+	if err != nil {
+		logger.Errorf("❌ [AUTH_HANDLER] Failed to create session: %v", err)
+		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		return
+	}
+	logger.Debugf("✅ [AUTH_HANDLER] Session created successfully: %s (expires: %s)", session.ID, session.ExpiresAt)
+
+	// Return session token
+	response := domain_auth.AuthResponse{
+		WSSessionToken: session.ID,
+		ExpiresAt:      session.ExpiresAt,
+		AppName:        principal.AppName,
+	}
+
+	logger.Debugf("🔑 [AUTH_HANDLER] Returning response: %+v", response)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

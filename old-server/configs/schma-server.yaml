@@ -1,0 +1,15 @@
+# Load once in cmd/schma-server/main.go, convert to strongly-typed Config struct, and pass down.
+
+http:
+    addr: ":8080"
+
+stt:
+    provider: google
+    api_key: ${STT_API_KEY} # looks up env var at load time
+
+gemini:
+    endpoint: "https://…/gemini:stream"
+    api_key: ${GEMINI_API_KEY}
+
+db:
+    dsn: ${SUPABASE_DATABASE_URL}

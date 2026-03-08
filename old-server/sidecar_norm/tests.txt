@@ -1,0 +1,59 @@
+# 1) Spoken date (DMY words) + time
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"follow up on the twenty third of may twenty twenty four at half past four"}'
+# expect: ... "text":"Follow up on 2024-05-23 at 04:30."
+
+# 2) Numeric AU date (DD/MM/YYYY) → ISO
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"appointment is on eleven slash zero three slash twenty twenty four"}'
+# expect: ... "text":"Appointment is on 2024-03-11."
+
+# 3) Date with ordinal phrasing (“the 11th of the 3rd, 2024”) → ISO
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"see you on the eleventh of the third twenty twenty four"}'
+# expect: ... "text":"See you on 2024-03-11."
+
+# 4) Currency + decimals
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"it cost one hundred and fifty dollars and twenty cents"}'
+# expect: ... "text":"It cost $150.20."
+
+# 5) Measures + decimals
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"give five point two litres and ten milligrams"}'
+# expect: ... "text":"Give 5.2 L and 10 mg."
+
+# 6) AU mobile (local): “oh four …” → 04xx xxx xxx
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"his mobile is oh four one two three four five six seven eight"}'
+# expect: ... "text":"His mobile is 0412 345 678."
+
+# 7) AU mobile (+61): “plus sixty one four one two …”
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"reach me on plus sixty one four one two three four five six seven eight"}'
+# expect: ... "text":"Reach me on +61 412 345 678."
+
+# 8) AU landline with area code: “(oh two) nine one two three four five six seven”
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"office line is oh two nine one two three four five six seven"}'
+# expect: ... "text":"Office line is 02 9123 4567."
+
+# 9) “double” / “triple” in phones (still canonicalized)
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"my number is oh four double three one nine double zero seven eight"}'
+# expect: ... "text":"My number is 0433 190 078."
+
+# 10) Mixed “oh/o” within digits
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"pager is oh four zero eight zero zero one zero two three"}'
+# expect: ... "text":"Pager is 0408 001 023."
+
+# 11) Space-separated numeric date (DMY) → ISO
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"the date is the fifteenth of March twenty twenty three"}'
+# expect: ... "text":"The date is 2023-05-01."
+
+# 12) Combo sample (numbers, time, ISO date, AU phone)
+curl --unix-socket /tmp/norm.sock http://unix/norm -H 'content-type: application/json' \
+  -d '{"text":"patient has twenty three milligrams at half past four on eleven oh three twenty twenty four and call me on oh four two three oh six oh six four six"}'
+# expect: ... "text":"Patient has 23 mg at 04:30 on 2024-03-11. And call me on 0423 060 646."

@@ -1,0 +1,22 @@
+# Ignore everything by default
+**
+
+# Allow only what the Dockerfile needs
+!go.mod
+!go.sum
+!cmd/**
+!internal/**
+!pkg/**
+
+# Sidecars & deps explicitly allowed
+!sidecar_norm/**
+!sidecar_tok/**
+!sidecar/requirements.txt
+!sidecar/constraints.txt
+!docker/entrypoint.sh
+!runtime/onnxruntime-linux-x64-1.17.0/lib/libonnxruntime.so.1.17.0
+
+# Keep these meta files
+!.dockerignore
+!fly.toml
+!Makefile

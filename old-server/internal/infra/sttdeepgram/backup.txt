@@ -1,0 +1,172 @@
+package sttdeepgram
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gorilla/websocket"
+
+	"schma.ai/internal/domain/speech"
+)
+
+const (
+	deepgramWS = "wss://api.deepgram.com/v1/listen"
+	sampleRate = 16000
+	bitsPerSec = 32000.0 // 16-bit mono @16 kHz
+)
+
+// compile-time check
+var _ speech.STTClient = (*Client)(nil)
+
+type Client struct {
+	apiKey string
+	model  string
+	dialer *websocket.Dialer
+}
+
+func New(apiKey, model string) *Client {
+	return &Client{
+		apiKey: apiKey,
+		model:  model,
+		dialer: &websocket.Dialer{
+			Proxy:            http.ProxyFromEnvironment,
+			HandshakeTimeout: 10 * time.Second,
+		},
+	}
+}
+
+/*──────────────────── speech.STT interface ────────────────────*/
+
+func (c *Client) Stream(
+	ctx context.Context,
+	audio <-chan speech.AudioChunk,
+) (<-chan speech.Transcript, error) {
+
+	h := http.Header{"Authorization": []string{"Token " + c.apiKey}}
+
+	ws, _, err := c.dialer.DialContext(ctx, deepgramWS, h)
+	if err != nil {
+		return nil, err
+	}
+
+	// send “start”
+	start := map[string]any{
+		"type":            "start",
+		"model":           c.model,
+		"language":        "en-US",
+		"encoding":        "linear16",
+		"sample_rate":     sampleRate,
+		"channels":        1,
+		"interim_results": true,
+	}
+	if err := ws.WriteJSON(start); err != nil {
+		return nil, err
+	}
+
+	out := make(chan speech.Transcript, 32)
+	done := make(chan struct{})
+
+	go uplink(ctx, ws, audio, done)
+	go downlink(ctx, ws, out, done)
+
+	return out, nil
+}
+
+/*──────────────────────── goroutines ──────────────────────────*/
+
+func uplink(
+	ctx context.Context,
+	ws *websocket.Conn,
+	audio <-chan speech.AudioChunk,
+	done chan struct{},
+) {
+	defer ws.Close() // ensure close on exit
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-done: // downlink closed
+			return
+
+		case chunk, ok := <-audio:
+			if !ok {
+				_ = ws.WriteMessage(websocket.TextMessage,
+					mustJSON(map[string]any{"type": "stop"}))
+				return
+			}
+			if err := ws.WriteMessage(websocket.BinaryMessage, chunk); err != nil {
+				log.Printf("Deepgram uplink write: %v", err)
+				close(done)
+				return
+			}
+		}
+	}
+}
+
+func downlink(
+	ctx context.Context,
+	ws *websocket.Conn,
+	out chan<- speech.Transcript,
+	done chan struct{},
+) {
+	defer close(out)
+	defer close(done)
+	defer ws.Close()
+
+	for {
+		_, data, err := ws.ReadMessage()
+		if err != nil {
+			// Read error means socket closed – signal uplink & pipeline
+			return
+		}
+
+		var ev struct {
+			Type    string `json:"type"`
+			Channel struct {
+				Alternatives []struct {
+					Transcript string  `json:"transcript"`
+					Confidence float32 `json:"confidence"`
+					Words      []struct {
+						Word       string  `json:"word"`
+						Start      float32 `json:"start"`
+						End        float32 `json:"end"`
+						Confidence float32 `json:"confidence"`
+					} `json:"words"`
+				} `json:"alternatives"`
+			} `json:"channel"`
+			IsFinal bool `json:"is_final"`
+		}
+		if json.Unmarshal(data, &ev) != nil || ev.Type != "transcript" {
+			continue
+		}
+
+		for _, alt := range ev.Channel.Alternatives {
+			tr := speech.Transcript{
+				Text:       alt.Transcript,
+				IsFinal:    ev.IsFinal,
+				Confidence: alt.Confidence,
+			}
+			for _, w := range alt.Words {
+				tr.Words = append(tr.Words, speech.Word{
+					Text:       w.Word,
+					Start:      w.Start,
+					End:        w.End,
+					Confidence: w.Confidence,
+				})
+			}
+			out <- tr
+		}
+	}
+}
+
+/*──────────────────────── helpers ─────────────────────────────*/
+
+func mustJSON(v any) []byte {
+	b, _ := json.Marshal(v)
+	return b
+}

@@ -1,0 +1,107 @@
+asyncapi: "2.6.0"
+info:
+    title: Memo WebSocket API
+    version: "0.1.0"
+defaultContentType: application/json
+channels:
+    ws/events:
+        subscribe:
+            message:
+                oneOf:
+                    - $ref: "#/components/messages/TranscriptDelta"
+                    - $ref: "#/components/messages/FunctionDraft"
+                    - $ref: "#/components/messages/FunctionFinal"
+                    - $ref: "#/components/messages/Error"
+        publish:
+            message:
+                oneOf:
+                    - $ref: "#/components/messages/AudioChunk"
+                    - $ref: "#/components/messages/Control"
+                    - $ref: "#/components/messages/SchemaUpdate"
+components:
+    messages:
+        TranscriptDelta:
+            name: transcript.delta
+            payload:
+                type: object
+                properties:
+                    sessionId:
+                        type: string
+                        format: uuid
+                    text:
+                        type: string
+                    seq:
+                        type: integer
+        AudioChunk:
+            name: audio.chunk
+            payload:
+                type: object
+                properties:
+                    sessionId:
+                        type: string
+                        format: uuid
+                    seq:
+                        type: integer
+                    bytes:
+                        type: string
+                        format: binary
+        Control:
+            name: control
+            payload:
+                type: object
+                properties:
+                    type:
+                        type: string
+                        enum: [pause, resume, flush]
+                    sessionId:
+                        type: string
+                        format: uuid
+        SchemaUpdate:
+            name: schema.update
+            payload:
+                type: object
+                properties:
+                    tools:
+                        type: array
+                        items:
+                            type: object
+                            # TODO: Define tool schema structure
+        FunctionDraft:
+            name: function.draft
+            payload:
+                type: object
+                properties:
+                    sessionId:
+                        type: string
+                        format: uuid
+                    functionId:
+                        type: string
+                        format: uuid
+                    content:
+                        type: object
+                        # TODO: Define function content structure
+        FunctionFinal:
+            name: function.final
+            payload:
+                type: object
+                properties:
+                    sessionId:
+                        type: string
+                        format: uuid
+                    functionId:
+                        type: string
+                        format: uuid
+                    content:
+                        type: object
+                        # TODO: Define function content structure
+        Error:
+            name: error
+            payload:
+                type: object
+                properties:
+                    code:
+                        type: string
+                    message:
+                        type: string
+                    details:
+                        type: object

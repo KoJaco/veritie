@@ -1,0 +1,6 @@
+numpy==1.26.4
+onnxruntime==1.17.0
+# if anything forces numpy>=2, pin that package lower here too.
+# examples (only if you actually use them):
+# scikit-learn<1.5
+# scipy<1.13
