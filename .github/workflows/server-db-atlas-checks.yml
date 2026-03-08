@@ -1,0 +1,60 @@
+name: Server DB Atlas Checks
+
+on:
+    pull_request:
+        paths:
+            - "server/atlas.hcl"
+            - "server/internal/infra/db/postgres/**"
+            - ".github/workflows/server-db-atlas-checks.yml"
+    push:
+        branches:
+            - main
+        paths:
+            - "server/atlas.hcl"
+            - "server/internal/infra/db/postgres/**"
+            - ".github/workflows/server-db-atlas-checks.yml"
+
+jobs:
+    atlas-checks:
+        runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_DB: postgres
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: postgres
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U postgres -d postgres"
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Set up Atlas
+              uses: ariga/setup-atlas@v0
+
+            - name: Validate schema file exists
+              run: test -f server/internal/infra/db/postgres/schema.hcl
+
+            - name: Dry-run schema apply
+              run: |
+                  atlas schema apply \
+                    --url "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" \
+                    --to "file://server/internal/infra/db/postgres/schema.hcl" \
+                    --dry-run
+
+            - name: Migration replay dry-run (if migrations exist)
+              run: |
+                  if ls server/internal/infra/db/postgres/migrations/*.sql >/dev/null 2>&1; then
+                    atlas migrate apply \
+                      --url "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" \
+                      --dir "file://server/internal/infra/db/postgres/migrations" \
+                      --dry-run
+                  else
+                    echo "No SQL migrations found in server/internal/infra/db/postgres/migrations; skipping replay check."
+                  fi

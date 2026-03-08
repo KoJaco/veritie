@@ -1,57 +1,57 @@
 name: Server Go Baseline
 
 on:
-  pull_request:
-    paths:
-      - "server/**"
-      - ".github/workflows/server-go-baseline.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "server/**"
-      - ".github/workflows/server-go-baseline.yml"
+    pull_request:
+        paths:
+            - "server/**"
+            - ".github/workflows/server-go-baseline.yml"
+    push:
+        branches:
+            - main
+        paths:
+            - "server/**"
+            - ".github/workflows/server-go-baseline.yml"
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    test:
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: server
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: server/go.mod
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version-file: server/go.mod
 
-      - name: Download dependencies
-        run: go mod download
+            - name: Download dependencies
+              run: go mod download
 
-      - name: Verify module graph is tidy
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod
-          if [ -f go.sum ]; then
-            git diff --exit-code go.sum
-          fi
+            - name: Verify module graph is tidy
+              run: |
+                  go mod tidy
+                  git diff --exit-code go.mod
+                  if [ -f go.sum ]; then
+                    git diff --exit-code go.sum
+                  fi
 
-      - name: Run tests
-        run: go test ./...
+            - name: Run tests
+              run: go test ./...
 
-      - name: Run vet
-        run: go vet ./...
+            - name: Run vet
+              run: go vet ./...
 
-      - name: Run race tests
-        run: go test -race ./...
+            - name: Run race tests
+              run: go test -race ./...
 
-      - name: Run coverage
-        run: go test -coverprofile=coverage.out ./...
+            - name: Run coverage
+              run: go test -coverprofile=coverage.out ./...
 
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: server-go-coverage
-          path: server/coverage.out
+            - name: Upload coverage artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: server-go-coverage
+                  path: server/coverage.out
