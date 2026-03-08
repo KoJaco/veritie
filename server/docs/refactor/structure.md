@@ -49,8 +49,10 @@ This document describes the intended structure under `/server`.
         client.go
       providers/
         stt/
+          deepgram.go
           speechmatics.go
           provider.go
+          transcript.go
         llm/
           gemini.go
       storage/

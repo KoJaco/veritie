@@ -37,9 +37,9 @@ This mapping documents reusable components from `/old-server` and their target h
     - Notes: keep DB pooling helpers and per-request context wiring. Websocket connection pool not reused.
 
 - STT/LLM providers
-    - Source: `/old-server/internal/infra/sttgoogle`, `/old-server/internal/infra/llmgemini`
+    - Source: `/old-server/internal/infra/sttdeepgram`, `/old-server/internal/infra/sttgoogle`, `/old-server/internal/infra/llmgemini`
     - Target: `/server/internal/infra/providers/stt`, `/server/internal/infra/providers/llm`
-    - Notes: adapt to batch-only interfaces and short-audio constraints.
+    - Notes: Deepgram is the initial/default STT adapter; keep provider-agnostic transcript types and prepare Speechmatics as a second adapter via the same interface.
 
 - Supabase schema + migrations
     - Source: `/old-server/internal/infra/db/schema.hcl`, `/old-server/internal/infra/db/supabase/migrations`, `/old-server/atlas.hcl`
