@@ -39,6 +39,7 @@ No further branch split required. Model/policy/interfaces/service should land at
    - clock/id generation abstractions where determinism is needed for testing
 4. Implement jobs service in `service.go`:
    - create/start/advance/fail/cancel/complete operations
+   - create/rerun paths snapshot app runtime contract (schema_version_id, toolset_version_id, config_snapshot)
    - write-through behavior for job state + event append
    - rerun creation path that snapshots references to prior job
 5. Add invariants and guardrails:
