@@ -38,6 +38,14 @@ jobs:
                     git diff --exit-code go.sum
                   fi
 
+            - name: Install sqlc
+              run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.29.0
+
+            - name: Verify sqlc generated code is up to date
+              run: |
+                  (cd internal/infra/db/postgres && sqlc generate)
+                  git diff --exit-code internal/infra/db/postgres/dbgen
+
             - name: Run tests
               run: go test ./...
 

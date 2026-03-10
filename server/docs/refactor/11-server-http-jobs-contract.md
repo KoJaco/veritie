@@ -24,7 +24,7 @@ No split required. These three endpoints share auth, validation, and response sc
 
 ## Implementation Plan
 1. Define request/response contracts:
-   - create-job payload (audio source, metadata, optional overrides as allowed by policy)
+   - create-job payload (audio source, metadata, idempotency only; no client runtime overrides)
    - job summary/detail response model
    - rerun request model and response linkage fields
    - standardized error envelope
@@ -35,7 +35,7 @@ No split required. These three endpoints share auth, validation, and response sc
 3. Implement validation rules:
    - required field and type validation
    - source constraints for audio input modes
-   - strict rejection of forbidden client-provided runtime config objects
+   - strict rejection of client-provided schema/toolset/runtime override objects
    - idempotency-key format and dedup semantics for create-job
 4. Implement authorization checks:
    - principal/account scoping for job read and rerun operations

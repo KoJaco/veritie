@@ -12,6 +12,7 @@ Refactor velocity increases failure risk. Without structured telemetry and usage
 - Provider call metrics and error classification tags
 - Usage event collection and persistence hooks
 - Correlation IDs across request/job/stage/provider boundaries
+- Runtime-vs-persistence telemetry separation (stream emissions vs durable checkpoints)
 
 ## Out of Scope
 - External dashboard implementation details

@@ -402,8 +402,9 @@ Tags are first-class and multi-assignable:
 
 ### 14.4 SSE
 
-- stream the same job events you persist
-- SSE is a view over the event log, not a separate truth
+- runtime SSE events can be higher-frequency than persistence checkpoints
+- persist coarse lifecycle checkpoints and stable artifacts; do not persist every transient stream emission
+- replay starts from persisted `job_events` and then tails live runtime updates
 
 ---
 

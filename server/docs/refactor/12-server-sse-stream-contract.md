@@ -1,7 +1,7 @@
 # 12 Server SSE Stream Contract
 
 ## Objective
-Implement and lock the SSE contract for job lifecycle streaming with authenticated access, deterministic ordering, and replay support from persisted events.
+Implement and lock the SSE contract for job lifecycle streaming with authenticated access, deterministic ordering, and replay support from persisted checkpoints.
 
 ## Why This Branch Exists
 SSE is the real-time visibility layer for batch jobs. Without a strict stream contract, clients cannot reliably render progress, recover from disconnects, or trust event ordering.
@@ -34,6 +34,7 @@ No split required. Stream auth, event envelope, keepalive, and replay behavior m
    - support resume from last event cursor (`Last-Event-ID` or explicit cursor strategy)
    - load persisted events in deterministic order before live tailing
    - transition seamlessly from replay batch to live event feed
+   - keep runtime SSE granularity independent from persistence write granularity
 4. Implement live fanout behavior:
    - subscribe stream to in-process event broadcaster source
    - emit ordered events as runner persists stage updates
