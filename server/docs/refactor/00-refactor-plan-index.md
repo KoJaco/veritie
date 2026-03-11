@@ -29,5 +29,5 @@ This directory contains the execution plan as an ordered sequence of implementat
 - Refactor branch-plan documents `01` through `19` are now fully scaffolded and fleshed out.
 - Implementation status must be tracked per execution branch/PR, not inferred from this index file.
 - Existing CI scaffolds present in workspace:
-  - `.github/workflows/server-go-baseline.yml`
-  - `.github/workflows/server-db-atlas-checks.yml`
+    - `.github/workflows/server-go-baseline.yml`
+    - `.github/workflows/server-db-atlas-checks.yml`

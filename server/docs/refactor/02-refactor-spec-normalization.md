@@ -53,3 +53,22 @@ All migration branches depend on unambiguous documentation. Incorrect paths or s
 - No stale `/old/server`, `/veritie`, or `/new` path references remain in `refactor-map.md` and `structure.md` content (excluding intentional mention in migration instructions).
 - `internal/pkg/schema` and `internal/pkg/evidence` are represented.
 - Transport boundary wording is explicit and internally consistent.
+
+## Completion Status (2026-03-11)
+
+Branch 02 is complete for scoped deliverables.
+
+Implemented evidence:
+- Normalized mapping and scope language: `server/docs/refactor/refactor-map.md`
+- Updated intended `/server` structure and package representation: `server/docs/refactor/structure.md`
+- Explicit transport boundary language (`transport/http`, `transport/sse`): `server/docs/refactor/ground-truth.md`
+
+Verification snapshot:
+- Search check for stale tokens across normalized target docs passes: no `/old/server`, `/veritie`, or `/new` matches in target files.
+- Manual consistency pass confirms MVP excludes WebSocket/realtime paths in canonical refactor docs.
+
+Related documentation:
+- `server/docs/architecture/server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/contracts/server-foundation-runtime-and-ci-contract.md`
+- `server/docs/adr/ADR-0003-server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/decisions/refactor-02-05-foundation-completion-summary.md`
