@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -40,14 +41,18 @@ func NewServer(cfg ServerConfig) *Server {
 
 func (s *Server) Start() error {
 	if s == nil || s.httpServer == nil {
+		return errors.New("http server is not initialized")
+	}
+	err := s.httpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
-	return s.httpServer.ListenAndServe()
+	return err
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	if s == nil || s.httpServer == nil {
-		return nil
+		return errors.New("http server is not initialized")
 	}
 	return s.httpServer.Shutdown(ctx)
 }

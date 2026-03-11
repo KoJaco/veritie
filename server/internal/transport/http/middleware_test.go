@@ -30,7 +30,7 @@ func newAuthServiceForTest(t *testing.T, rawKey string) *auth.Service {
 		AppID:                  uuid.New(),
 		AccountID:              uuid.New(),
 		KeyHash:                auth.HashCredential(rawKey),
-		KeyPrefix:              auth.KeyPrefix(rawKey),
+		KeyPrefix:              "vt_live_",
 		SchemaID:               uuid.New(),
 		ActiveSchemaVersionID:  uuid.New(),
 		ActiveToolsetVersionID: uuid.New(),
@@ -156,5 +156,19 @@ func TestSSEAuthParity(t *testing.T) {
 				t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
 			}
 		})
+	}
+}
+
+func TestAuthMiddlewareNilServiceFailsClosed(t *testing.T) {
+	mw := NewAuthMiddleware(nil, nil, nil)
+	protected := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs", nil)
+	rr := httptest.NewRecorder()
+	protected.ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
 	}
 }

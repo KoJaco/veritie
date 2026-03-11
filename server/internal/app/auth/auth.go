@@ -15,9 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/singleflight"
 )
-
-const keyPrefixLen = 8
 
 // ErrorCode defines stable auth failure categories.
 type ErrorCode string
@@ -73,7 +72,7 @@ func HTTPStatus(err error) int {
 	}
 }
 
-// APIKeyRecord is the DB-facing auth identity record.
+// APIKeyRecord is the DB-facing auth identity record. Check against our schema.hcl
 type APIKeyRecord struct {
 	KeyID                  uuid.UUID
 	AppID                  uuid.UUID
@@ -106,7 +105,7 @@ type PrincipalSnapshot struct {
 
 // Resolver resolves API keys and runtime bundle references.
 type Resolver interface {
-	LookupAPIKey(ctx context.Context, keyPrefix string) (APIKeyRecord, error)
+	LookupAPIKey(ctx context.Context, credentialHash string) (APIKeyRecord, error)
 }
 
 // Metrics captures auth-path counters/histograms.
@@ -123,8 +122,10 @@ func (noopMetrics) ObserveHistogram(string, float64, map[string]string) {}
 var ErrNotFound = errors.New("auth record not found")
 
 type cacheEntry struct {
-	principal PrincipalSnapshot
-	expiresAt time.Time
+	principal       PrincipalSnapshot
+	expiresAt       time.Time
+	lastValidatedAt time.Time
+	lastAccessedAt  time.Time
 }
 
 // Service authenticates credentials and returns request principal snapshots.
@@ -133,9 +134,13 @@ type Service struct {
 	metrics  Metrics
 	ttl      time.Duration
 	now      func() time.Time
+	maxSize  int
+	// Revalidate cached credentials against DB periodically to reduce revocation windows.
+	revalidateAfter time.Duration
 
 	mu    sync.RWMutex
 	cache map[string]cacheEntry
+	sf    singleflight.Group
 }
 
 type Option func(*Service)
@@ -164,13 +169,32 @@ func WithNow(nowFn func() time.Time) Option {
 	}
 }
 
+func WithMaxCacheSize(max int) Option {
+	return func(s *Service) {
+		if max > 0 {
+			s.maxSize = max
+		}
+	}
+}
+
+func WithRevalidateAfter(d time.Duration) Option {
+	return func(s *Service) {
+		if d > 0 {
+			s.revalidateAfter = d
+		}
+	}
+}
+
 func NewService(resolver Resolver, opts ...Option) *Service {
 	svc := &Service{
 		resolver: resolver,
 		metrics:  noopMetrics{},
 		ttl:      60 * time.Second,
 		now:      time.Now,
-		cache:    map[string]cacheEntry{},
+		maxSize:  10000,
+		// Keep revocation window small while preserving cache value.
+		revalidateAfter: 10 * time.Second,
+		cache:           map[string]cacheEntry{},
 	}
 	for _, opt := range opts {
 		opt(svc)
@@ -190,15 +214,19 @@ func (s *Service) Authenticate(ctx context.Context, credential string) (Principa
 	totalStart := s.now()
 	credHash := HashCredential(credential)
 
-	if principal, ok := s.cacheGet(credHash); ok {
+	// Cache hit and observe
+	if principal, ok := s.cacheGet(ctx, credHash); ok {
 		s.metrics.IncCounter("auth.cache.hit", 1, nil)
 		s.observeMS("auth.total_ms", totalStart)
 		return principal, nil
 	}
+
+	// Cache miss follow through
 	s.metrics.IncCounter("auth.cache.miss", 1, nil)
 
+	// DB lookup
 	lookupStart := s.now()
-	record, err := s.resolver.LookupAPIKey(ctx, KeyPrefix(credential))
+	record, err := s.resolver.LookupAPIKey(ctx, credHash)
 	s.observeMS("auth.lookup_ms", lookupStart)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -248,29 +276,99 @@ func cloneBytes(in []byte) []byte {
 	return out
 }
 
-func (s *Service) cacheGet(credentialHash string) (PrincipalSnapshot, bool) {
+func (s *Service) cacheGet(ctx context.Context, credentialHash string) (PrincipalSnapshot, bool) {
+	now := s.now()
+
 	s.mu.RLock()
 	entry, ok := s.cache[credentialHash]
 	s.mu.RUnlock()
+
+	// Null cases
 	if !ok {
 		return PrincipalSnapshot{}, false
 	}
-	if !s.now().Before(entry.expiresAt) {
+	if !now.Before(entry.expiresAt) {
 		s.mu.Lock()
 		delete(s.cache, credentialHash)
 		s.mu.Unlock()
 		return PrincipalSnapshot{}, false
 	}
+
+	if now.Sub(entry.lastValidatedAt) >= s.revalidateAfter {
+		if !s.revalidateCachedEntry(ctx, credentialHash, now) {
+			s.mu.Lock()
+			delete(s.cache, credentialHash)
+			s.mu.Unlock()
+			return PrincipalSnapshot{}, false
+		}
+		entry.lastValidatedAt = now
+		entry.lastAccessedAt = now
+		s.mu.Lock()
+		s.cache[credentialHash] = entry
+		s.mu.Unlock()
+		return entry.principal, true
+	}
+
+	entry.lastAccessedAt = now
+	s.mu.Lock()
+	s.cache[credentialHash] = entry
+	s.mu.Unlock()
 	return entry.principal, true
 }
 
-func (s *Service) cacheSet(credentialHash string, principal PrincipalSnapshot, expiresAt time.Time) {
-	s.mu.Lock()
-	s.cache[credentialHash] = cacheEntry{
-		principal: principal,
-		expiresAt: expiresAt,
+func (s *Service) revalidateCachedEntry(ctx context.Context, credentialHash string, now time.Time) bool {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	s.mu.Unlock()
+	v, _, _ := s.sf.Do(credentialHash, func() (any, error) {
+		record, err := s.resolver.LookupAPIKey(ctx, credentialHash)
+		if err != nil || !constantHashMatch(record.KeyHash, credentialHash) || isRevokedOrExpired(record, now) {
+			return false, nil
+		}
+		return true, nil
+	})
+	valid, _ := v.(bool)
+	return valid
+}
+
+func (s *Service) cacheSet(credentialHash string, principal PrincipalSnapshot, expiresAt time.Time) {
+	now := s.now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for k, v := range s.cache {
+		if !now.Before(v.expiresAt) {
+			delete(s.cache, k)
+		}
+	}
+	if len(s.cache) >= s.maxSize {
+		evictOneLocked(s.cache)
+	}
+
+	s.cache[credentialHash] = cacheEntry{
+		principal:       principal,
+		expiresAt:       expiresAt,
+		lastValidatedAt: now,
+		lastAccessedAt:  now,
+	}
+}
+
+func evictOneLocked(cache map[string]cacheEntry) {
+	var (
+		oldestKey string
+		oldest    time.Time
+		set       bool
+	)
+	for k, v := range cache {
+		if !set || v.lastAccessedAt.Before(oldest) {
+			oldestKey = k
+			oldest = v.lastAccessedAt
+			set = true
+		}
+	}
+	if set {
+		delete(cache, oldestKey)
+	}
 }
 
 func (s *Service) observeMS(name string, start time.Time) {
@@ -307,14 +405,6 @@ func ParseCredential(h http.Header) (string, error) {
 	}
 }
 
-func KeyPrefix(credential string) string {
-	trimmed := strings.TrimSpace(credential)
-	if len(trimmed) <= keyPrefixLen {
-		return trimmed
-	}
-	return trimmed[:keyPrefixLen]
-}
-
 func HashCredential(credential string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(credential)))
 	return hex.EncodeToString(sum[:])
@@ -347,11 +437,11 @@ type PostgresResolver struct {
 	Pool *pgxpool.Pool
 }
 
-func (r *PostgresResolver) LookupAPIKey(ctx context.Context, keyPrefix string) (APIKeyRecord, error) {
+func (r *PostgresResolver) LookupAPIKey(ctx context.Context, credentialHash string) (APIKeyRecord, error) {
 	if r == nil || r.Pool == nil {
 		return APIKeyRecord{}, fmt.Errorf("postgres resolver pool is nil")
 	}
-	if strings.TrimSpace(keyPrefix) == "" {
+	if strings.TrimSpace(credentialHash) == "" {
 		return APIKeyRecord{}, ErrNotFound
 	}
 
@@ -374,7 +464,7 @@ FROM api_keys ak
 JOIN apps a
   ON a.id = ak.app_id
  AND a.account_id = ak.account_id
-WHERE ak.key_prefix = $1
+	WHERE ak.key_hash = $1
 LIMIT 1`
 
 	var (
@@ -382,7 +472,7 @@ LIMIT 1`
 		revokedAt *time.Time
 		expiresAt *time.Time
 	)
-	err := r.Pool.QueryRow(ctx, q, strings.TrimSpace(keyPrefix)).Scan(
+	err := r.Pool.QueryRow(ctx, q, strings.TrimSpace(credentialHash)).Scan(
 		&record.KeyID,
 		&record.AppID,
 		&record.AccountID,
@@ -406,4 +496,14 @@ LIMIT 1`
 	record.RevokedAt = revokedAt
 	record.ExpiresAt = expiresAt
 	return record, nil
+}
+
+func isRevokedOrExpired(record APIKeyRecord, now time.Time) bool {
+	if record.RevokedAt != nil && !record.RevokedAt.IsZero() {
+		return true
+	}
+	if record.ExpiresAt != nil && !record.ExpiresAt.After(now) {
+		return true
+	}
+	return false
 }

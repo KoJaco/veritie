@@ -25,7 +25,14 @@ type AuthzFunc func(principal auth.PrincipalSnapshot, r *http.Request) error
 // NewAuthMiddleware authenticates credentials and injects principal context.
 func NewAuthMiddleware(service *auth.Service, metrics auth.Metrics, authz AuthzFunc) func(http.Handler) http.Handler {
 	if service == nil {
-		panic("auth service is required")
+		return func(_ http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				writeAuthError(w, &auth.Error{
+					Code:    auth.CodeInternal,
+					Message: "auth service is unavailable",
+				})
+			})
+		}
 	}
 	if metrics == nil {
 		metrics = noopAuthMetrics{}
@@ -75,14 +82,28 @@ func NewAuthMiddleware(service *auth.Service, metrics auth.Metrics, authz AuthzF
 
 func writeAuthError(w http.ResponseWriter, err error) {
 	status := auth.HTTPStatus(err)
+	msg := "authentication failed"
 	payload := map[string]string{
 		"error":   "auth_error",
-		"message": err.Error(),
+		"message": msg,
 	}
 
 	var aerr *auth.Error
 	if errors.As(err, &aerr) {
 		payload["error"] = string(aerr.Code)
+		switch aerr.Code {
+		case auth.CodeMalformed:
+			msg = "malformed credential"
+		case auth.CodeForbidden:
+			msg = "forbidden"
+		case auth.CodeExpiredOrRevoked:
+			msg = "credential expired or revoked"
+		case auth.CodeInternal:
+			msg = "internal authentication error"
+		default:
+			msg = "authentication failed"
+		}
+		payload["message"] = msg
 	}
 
 	w.Header().Set("Content-Type", "application/json")

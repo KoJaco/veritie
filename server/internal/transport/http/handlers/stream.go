@@ -21,4 +21,8 @@ func Stream(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	_, _ = fmt.Fprintf(w, "event: job.snapshot\ndata: {\"app_id\":\"%s\",\"account_id\":\"%s\"}\n\n", principal.AppID, principal.AccountID)
+	_, _ = fmt.Fprint(w, ": keepalive\n\n")
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }
