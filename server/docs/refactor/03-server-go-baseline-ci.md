@@ -51,3 +51,28 @@ The server tree is being rebuilt incrementally; baseline checks must fail fast o
 - CI runs automatically on server-related changes.
 - `go test ./...`, `go vet ./...`, and `go test -race ./...` are enforced.
 - Coverage profile artifact is generated on successful runs.
+
+## Completion Status (2026-03-11)
+
+Branch 03 is complete for scoped deliverables.
+
+Implemented evidence:
+- Baseline workflow exists and is wired to server paths: `.github/workflows/server-go-baseline.yml`
+- Workflow enforces:
+  - `go mod tidy` diff check
+  - `go test ./...`
+  - `go vet ./...`
+  - `go test -race ./...`
+  - `go test -coverprofile=coverage.out ./...`
+  - coverage artifact upload
+- Additional guardrail present: sqlc generation drift check for `internal/infra/db/postgres/dbgen`
+
+Verification snapshot:
+- Workflow structure and trigger paths are valid for `server/**` and workflow file changes.
+- Checks align with branch objective of fail-fast Go baseline CI.
+
+Related documentation:
+- `server/docs/architecture/server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/contracts/server-foundation-runtime-and-ci-contract.md`
+- `server/docs/adr/ADR-0003-server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/decisions/refactor-02-05-foundation-completion-summary.md`

@@ -90,3 +90,42 @@ No further branch split required. Keeping DB core in one branch preserves veloci
 - DB integration tests pass for job CRUD and ordered event retrieval.
 - Atlas checks pass with current schema and migration directory layout.
 - Transaction helper guarantees rollback on error and safe cleanup.
+
+## Completion Status (2026-03-11)
+
+Branch 06 is complete for its scoped deliverables.
+
+Implemented evidence (high level):
+- Pool and health checks: `server/internal/infra/db/postgres/pool.go`
+- Transaction helper and retry classification: `server/internal/infra/db/postgres/tx.go`, `server/internal/infra/db/postgres/tx_test.go`
+- Jobs/events repositories and ordering/cursor queries:
+  `server/internal/infra/db/postgres/jobs_repo.go`,
+  `server/internal/infra/db/postgres/events_repo.go`,
+  `server/internal/infra/db/postgres/queries/jobs.sql`,
+  `server/internal/infra/db/postgres/queries/events.sql`
+- Migration bootstrap and schema hardening:
+  `server/internal/infra/db/postgres/migrations/202603100001_init.sql`,
+  `server/internal/infra/db/postgres/migrations/202603100002_hardening.sql`,
+  `server/internal/infra/db/postgres/schema.hcl`
+- Atlas wiring and CI checks:
+  `server/atlas.hcl`,
+  `.github/workflows/server-db-atlas-checks.yml`
+- Tests:
+  `server/internal/infra/db/postgres/jobs_repo_test.go`,
+  `server/internal/infra/db/postgres/events_repo_test.go`,
+  `server/internal/infra/db/postgres/repo_integration_test.go`
+
+Verification snapshot:
+- `go test ./internal/infra/db/postgres/...` passes.
+- `go test -tags=integration ./internal/infra/db/postgres/...` passes (or skips when `TEST_DATABASE_DSN` is unset).
+
+Temporary terminology delta (documented, non-blocking for branch 06):
+- DB enum currently uses `succeeded`/`cancelled` (`job_status_enum`).
+- Pipeline contract docs currently describe `completed`/`partial_success`.
+- This is tracked as cross-branch vocabulary evolution, not a branch-06 completeness blocker.
+
+Related documentation:
+- `server/docs/architecture/postgres-persistence-boundary.md`
+- `server/docs/contracts/postgres-persistence-runtime-contract.md`
+- `server/docs/adr/ADR-0002-postgres-persistence-boundary-and-hardening.md`
+- `server/docs/decisions/postgres-branch-06-completion-and-latency-defaults.md`

@@ -61,3 +61,29 @@ DB drift is a high-cost failure mode in refactors. This branch enforces schema a
 - Schema file presence is enforced.
 - Schema apply dry-run passes in CI.
 - Migration replay dry-run executes when SQL migrations exist, otherwise skips explicitly.
+
+## Completion Status (2026-03-11)
+
+Branch 04 is complete for scoped deliverables.
+
+Implemented evidence:
+- Atlas workflow with Postgres service container: `.github/workflows/server-db-atlas-checks.yml`
+- Trigger coverage includes:
+  - `server/atlas.hcl`
+  - `server/internal/infra/db/postgres/**`
+  - workflow file itself
+- Checks implemented:
+  - schema file existence assertion
+  - `atlas schema apply --dry-run`
+  - conditional `atlas migrate apply --dry-run` when SQL migrations exist
+- Atlas environment config present: `server/atlas.hcl`
+
+Verification snapshot:
+- Workflow implements explicit skip messaging when migration SQL files are absent.
+- Trigger paths and dry-run checks align to branch objective for schema/migration drift detection.
+
+Related documentation:
+- `server/docs/architecture/server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/contracts/server-foundation-runtime-and-ci-contract.md`
+- `server/docs/adr/ADR-0003-server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/decisions/refactor-02-05-foundation-completion-summary.md`

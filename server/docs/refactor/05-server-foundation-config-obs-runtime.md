@@ -63,3 +63,30 @@ All server branches depend on reliable startup behavior, configuration validatio
 - Baseline structured logs are emitted during startup and shutdown.
 - Metrics/tracing hooks are initialized and available for later instrumentation.
 - Build metadata is visible in startup logs and runtime info path (if exposed).
+
+## Completion Status (2026-03-11)
+
+Branch 05 is complete for scoped deliverables.
+
+Implemented evidence:
+- Config model and env loader: `server/internal/config/config.go`
+- Validation rules and edge-case tests: `server/internal/config/validate.go`, `server/internal/config/validate_test.go`
+- Observability foundation:
+  - logger: `server/internal/obs/logger.go`
+  - metrics interface + noop implementation: `server/internal/obs/metrics.go`
+  - tracing init/shutdown hooks: `server/internal/obs/tracing.go`
+- Build metadata structure: `server/internal/runtime/buildinfo.go`
+- Entrypoint wiring:
+  - API startup/shutdown: `server/cmd/api/main.go`
+  - worker startup/shutdown: `server/cmd/worker/main.go`
+
+Verification snapshot:
+- Startup path loads+validates config and fails fast on invalid values.
+- Startup logs include build metadata and runtime mode/process identity.
+- Shutdown path includes tracing and metrics cleanup hooks.
+
+Related documentation:
+- `server/docs/architecture/server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/contracts/server-foundation-runtime-and-ci-contract.md`
+- `server/docs/adr/ADR-0003-server-foundation-runtime-and-ci-guardrails.md`
+- `server/docs/decisions/refactor-02-05-foundation-completion-summary.md`
