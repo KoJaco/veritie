@@ -44,4 +44,3 @@ Does not cover websocket transport, real-time chunked audio streaming, or deep i
 - Capturing every runtime delta as durable DB writes.
 - Parallelizing extraction and tool suggestion in MVP.
 - Making indexing mandatory for initial completion semantics.
-
