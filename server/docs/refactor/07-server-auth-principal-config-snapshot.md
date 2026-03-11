@@ -2,7 +2,7 @@
 
 ## Objective
 
-Implement request authentication and principal resolution that returns a deterministic app-config snapshot (resolved server-side via config ID) for downstream pipeline execution.
+Implement request authentication and principal resolution that returns a deterministic app-config snapshot (resolved server-side from app active refs) for downstream pipeline execution.
 
 ## Why This Branch Exists
 
@@ -12,7 +12,7 @@ Jobs, provider routing, and policy decisions depend on a stable authenticated pr
 
 - `server/internal/app/auth`
 - HTTP auth middleware wiring under `server/internal/transport/http`
-- DB-backed app/principal lookup and config snapshot materialization via `config_id` indirection
+- DB-backed app/principal lookup and config snapshot materialization via active app refs (`active_schema_version_id`, `active_toolset_version_id`, runtime JSON config fields)
 - Unauthorized/forbidden error mapping for HTTP responses
 - SSE endpoint auth behavior (same credential parsing and principal resolution model as HTTP API routes)
 
@@ -31,13 +31,13 @@ No further branch split required. Auth service and middleware should land togeth
 
 1. Define principal/auth domain model in `internal/app/auth`:
     - principal identity fields (app/account IDs)
-    - resolved policy/config snapshot payload loaded by server-side `config_id`
+    - resolved policy/config snapshot payload loaded by server-side app active refs
     - auth error taxonomy (unauthenticated, unauthorized, disabled app, malformed key)
     - explicit model boundary that excludes client-passed config objects
 2. Implement auth service:
     - parse credential input from headers
     - lookup app/principal via repository
-    - resolve `config_id` -> config snapshot in the same auth resolution flow
+    - resolve active app refs -> config snapshot in the same auth resolution flow
     - validate active status and required config shape
     - return immutable request-scoped principal snapshot
 3. Implement HTTP middleware integration:
@@ -106,9 +106,43 @@ No further branch split required. Auth service and middleware should land togeth
 ## Acceptance Gates
 
 - Protected routes reject missing/invalid credentials with deterministic status codes.
-- Valid credentials resolve principal and app-config snapshot deterministically via server-side `config_id`.
+- Valid credentials resolve principal and app-config snapshot deterministically via server-side app active refs.
 - No endpoint accepts client-supplied config object as authoritative auth/runtime config.
 - Auth context is accessible from handlers/services without type assertions leaking transport details.
 - HTTP and SSE use shared auth parsing/resolution behavior; no websocket upgrade logic remains.
 - Auth-path latency is instrumented and meets agreed budget in test/staging validation.
 - Unit and middleware auth tests pass in CI.
+
+## Completion Status (2026-03-11)
+
+Branch 07 is complete for scoped deliverables using the active-refs runtime snapshot model (superseding earlier `config_id` wording).
+
+Implemented evidence:
+- Auth model/service/parser/context helpers and DB-backed resolver:
+  `server/internal/app/auth/auth.go`
+- Auth tests (parser, service decision paths, cache behavior, benchmark):
+  `server/internal/app/auth/auth_test.go`
+- Shared HTTP/SSE auth middleware and deterministic error mapping:
+  `server/internal/transport/http/middleware.go`
+- Protected jobs/stream route wiring with shared middleware path:
+  `server/internal/transport/http/routes.go`,
+  `server/internal/transport/http/handlers/jobs.go`,
+  `server/internal/transport/http/handlers/stream.go`
+- Middleware parity tests (HTTP + SSE):
+  `server/internal/transport/http/middleware_test.go`
+
+Verification snapshot:
+- `go test ./internal/app/auth ./internal/transport/http/...` passes.
+- `go test ./...` passes for server module after branch-07 changes.
+
+Operational contract notes:
+- Accepted credential headers: `Authorization: Bearer <key>` and `X-API-Key`.
+- Missing/malformed/invalid/revoked/expired credentials map to `401`.
+- Forbidden authorization checks map to `403`.
+- Principal snapshot is request-context scoped and reused consistently for HTTP + SSE transport paths.
+
+Related documentation:
+- `server/docs/architecture/auth-principal-snapshot-runtime-boundary.md`
+- `server/docs/contracts/auth-principal-runtime-contract.md`
+- `server/docs/adr/ADR-0004-auth-principal-snapshot-and-credential-transport.md`
+- `server/docs/decisions/auth-branch-07-completion-and-operational-defaults.md`
